@@ -1,11 +1,72 @@
 use board_repr_perft::common::Piece;
+use board_repr_perft::common::PieceLocation;
 use board_repr_perft::*;
+use criterion::measurement::WallTime;
 use criterion::*;
 use rand::prelude::*;
 
-fn bench(c: &mut Criterion) {
-    let mut piece_sequence = vec![];
-    for _ in 0..1000 {
+fn dellacherie(c: &mut Criterion) {
+    fn bench<I: Implementation>(group: &mut BenchmarkGroup<WallTime>, pieces: &[Piece]) {
+        group.bench_function(I::NAME, |b| b.iter(|| I::simulate(pieces)));
+    }
+
+    let piece_sequence = gen_seq(1000);
+
+    let mut group = c.benchmark_group("dellacherie");
+
+    bench::<Naive>(&mut group, &piece_sequence);
+    bench::<NaiveColHeights>(&mut group, &piece_sequence);
+    bench::<RowBits>(&mut group, &piece_sequence);
+    bench::<RowBitsColHeights>(&mut group, &piece_sequence);
+    bench::<ColBits>(&mut group, &piece_sequence);
+    bench::<ColBitsPext>(&mut group, &piece_sequence);
+}
+
+fn advance(c: &mut Criterion) {
+    let mut board = <ColBits as Implementation>::Board::new();
+    let mut placements = Vec::with_capacity(10000);
+    for p in gen_seq(10000) {
+        if let Some(placement) = <ColBits as Implementation>::suggest(&board, p) {
+            board.place(placement);
+            board.collapse_lines();
+            placements.push(placement);
+        }
+    }
+
+    fn bench<I: Implementation>(group: &mut BenchmarkGroup<WallTime>, places: &[PieceLocation]) {
+        group.bench_function(I::NAME, |b| {
+            b.iter(|| {
+                let mut board = I::Board::new();
+                for &placement in places {
+                    board.place(placement);
+                    board.collapse_lines();
+                }
+                board
+            })
+        });
+    }
+
+    let mut group = c.benchmark_group("advance");
+
+    bench::<Naive>(&mut group, &placements);
+    bench::<NaiveColHeights>(&mut group, &placements);
+    bench::<RowBits>(&mut group, &placements);
+    bench::<RowBitsColHeights>(&mut group, &placements);
+    bench::<ColBits>(&mut group, &placements);
+    bench::<ColBitsPext>(&mut group, &placements);
+}
+
+criterion_group! {
+    name = benchmarks;
+    config = Criterion::default().measurement_time(std::time::Duration::from_secs(30));
+    targets = dellacherie, advance
+}
+
+criterion_main!(benchmarks);
+
+fn gen_seq(n: usize) -> Vec<Piece> {
+    let mut piece_sequence = Vec::with_capacity(n);
+    for _ in 0..n {
         piece_sequence.push(match thread_rng().gen_range(0..7) {
             0 => Piece::I,
             1 => Piece::O,
@@ -17,26 +78,5 @@ fn bench(c: &mut Criterion) {
             _ => unreachable!(),
         })
     }
-
-    let mut group = c.benchmark_group("dellacherie");
-    group.bench_function("naive", |b| b.iter(|| naive::benchmark(&piece_sequence)));
-    group.bench_function("naive + col heights", |b| {
-        b.iter(|| naive_col_heights::benchmark(&piece_sequence))
-    });
-    group.bench_function("row bits", |b| {
-        b.iter(|| row_bits::benchmark(&piece_sequence))
-    });
-    group.bench_function("row bits + col heights", |b| {
-        b.iter(|| row_bits_col_heights::benchmark(&piece_sequence))
-    });
-    group.bench_function("col bits", |b| {
-        b.iter(|| column_bits::benchmark(&piece_sequence))
-    });
-    group.bench_function("col bits pext", |b| {
-        b.iter(|| column_bits_pext::benchmark(&piece_sequence))
-    });
+    piece_sequence
 }
-
-criterion_group!(benchmarks, bench,);
-
-criterion_main!(benchmarks);

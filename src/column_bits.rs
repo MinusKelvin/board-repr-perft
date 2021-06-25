@@ -1,35 +1,21 @@
-use crate::common::*;
+use crate::{common::*, BoardImpl, Implementation};
+
+pub struct ColBits;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Board {
     columns: [u64; 10],
 }
 
-impl Board {
+impl BoardImpl for Board {
     fn new() -> Self {
         Board { columns: [0; 10] }
-    }
-
-    fn get(&self, x: i8, y: i8) -> bool {
-        self.columns[x as usize] & 1 << y != 0
     }
 
     fn place(&mut self, piece: PieceLocation) {
         for &(x, y) in &piece.cells() {
             self.columns[x as usize] |= 1 << y;
         }
-    }
-
-    fn column_height(&self, x: i8) -> i8 {
-        64 - self.columns[x as usize].leading_zeros() as i8
-    }
-
-    fn distance_to_ground(self, x: i8, y: i8) -> i8 {
-        (!self.columns[x as usize] << (63 - y)).leading_ones() as i8
-    }
-
-    fn line_clear_mask(&self) -> u64 {
-        self.columns.iter().fold(!0, |a, b| a & b)
     }
 
     fn collapse_lines(&mut self) -> i32 {
@@ -60,6 +46,24 @@ impl Board {
         }
         line_clear_mask.count_ones() as i32
     }
+}
+
+impl Board {
+    fn get(&self, x: i8, y: i8) -> bool {
+        self.columns[x as usize] & 1 << y != 0
+    }
+
+    fn column_height(&self, x: i8) -> i8 {
+        64 - self.columns[x as usize].leading_zeros() as i8
+    }
+
+    fn distance_to_ground(self, x: i8, y: i8) -> i8 {
+        (!self.columns[x as usize] << (63 - y)).leading_ones() as i8
+    }
+
+    fn line_clear_mask(&self) -> u64 {
+        self.columns.iter().fold(!0, |a, b| a & b)
+    }
 
     #[cfg(test)]
     pub fn fumenize(self) -> fumen::Fumen {
@@ -76,82 +80,77 @@ impl Board {
     }
 }
 
-pub fn benchmark(pieces: &[Piece]) -> Board {
-    let mut board = Board::new();
-    for &p in pieces {
-        if let Some(placement) = suggest(&board, p) {
-            board.place(placement);
-            board.collapse_lines();
-        }
-    }
-    board
-}
+impl Implementation for ColBits {
+    type Board = Board;
 
-fn suggest(board: &Board, piece: Piece) -> Option<PieceLocation> {
-    let mut best = None;
+    const NAME: &'static str = "col bits";
 
-    for &rotation in piece.sensible_rotations() {
-        'placement: for x in 0..10 {
-            let mut piece = PieceLocation {
-                piece,
-                rotation,
-                x,
-                y: 0,
-            };
+    fn suggest(board: &Board, piece: Piece) -> Option<PieceLocation> {
+        let mut best = None;
 
-            for &(x, y) in &piece.cells() {
-                if x < 0 || x >= 10 {
-                    continue 'placement;
+        for &rotation in piece.sensible_rotations() {
+            'placement: for x in 0..10 {
+                let mut piece = PieceLocation {
+                    piece,
+                    rotation,
+                    x,
+                    y: 0,
+                };
+
+                for &(x, y) in &piece.cells() {
+                    if x < 0 || x >= 10 {
+                        continue 'placement;
+                    }
+
+                    piece.y = piece.y.max(board.column_height(x) - y);
                 }
 
-                piece.y = piece.y.max(board.column_height(x) - y);
-            }
+                let mut board = *board;
+                board.place(piece);
 
-            let mut board = *board;
-            board.place(piece);
+                let line_clear_mask = board.line_clear_mask();
+                let piece_cells_eliminated = piece
+                    .cells()
+                    .iter()
+                    .filter(|&&(_, y)| line_clear_mask & 1 << y != 0)
+                    .count() as i32;
 
-            let line_clear_mask = board.line_clear_mask();
-            let piece_cells_eliminated = piece
-                .cells()
-                .iter()
-                .filter(|&&(_, y)| line_clear_mask & 1 << y != 0)
-                .count() as i32;
+                let lines_cleared = board.collapse_lines();
 
-            let lines_cleared = board.collapse_lines();
+                let mut low = 40;
+                let mut high = 0;
+                for &(_, y) in &piece.cells() {
+                    low = low.min(y);
+                    high = high.max(y);
+                }
 
-            let mut low = 40;
-            let mut high = 0;
-            for &(_, y) in &piece.cells() {
-                low = low.min(y);
-                high = high.max(y);
-            }
+                let landing_height = low as i32 + high as i32;
+                let eroded_piece_cells_metric = lines_cleared * piece_cells_eliminated;
+                let row_transitions = row_transitions(&board);
+                let column_transitions = column_transitions(&board);
+                let buried_holes = buried_holes(&board);
+                let wells = wells(&board);
 
-            let landing_height = low as i32 + high as i32;
-            let eroded_piece_cells_metric = lines_cleared * piece_cells_eliminated;
-            let row_transitions = row_transitions(&board);
-            let column_transitions = column_transitions(&board);
-            let buried_holes = buried_holes(&board);
-            let wells = wells(&board);
+                let score = 2 * eroded_piece_cells_metric
+                    - landing_height
+                    - 2 * row_transitions
+                    - 2 * column_transitions
+                    - 8 * buried_holes
+                    - 2 * wells;
 
-            let score = 2 * eroded_piece_cells_metric
-                - landing_height
-                - 2 * row_transitions
-                - 2 * column_transitions
-                - 8 * buried_holes
-                - 2 * wells;
-
-            match best {
-                None => best = Some((piece, score)),
-                Some((_, s)) => {
-                    if score > s {
-                        best = Some((piece, score))
+                match best {
+                    None => best = Some((piece, score)),
+                    Some((_, s)) => {
+                        if score > s {
+                            best = Some((piece, score))
+                        }
                     }
                 }
             }
         }
-    }
 
-    best.map(|(p, _)| p)
+        best.map(|(p, _)| p)
+    }
 }
 
 fn row_transitions(board: &Board) -> i32 {

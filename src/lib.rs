@@ -1,11 +1,20 @@
+use common::{Piece, PieceLocation};
+
 pub mod common;
 
-pub mod naive;
-pub mod naive_col_heights;
-pub mod row_bits;
-pub mod row_bits_col_heights;
-pub mod column_bits;
-pub mod column_bits_pext;
+mod naive;
+mod naive_col_heights;
+mod row_bits;
+mod row_bits_col_heights;
+mod column_bits;
+mod column_bits_pext;
+
+pub use naive::Naive;
+pub use naive_col_heights::NaiveColHeights;
+pub use row_bits::RowBits;
+pub use row_bits_col_heights::RowBitsColHeights;
+pub use column_bits::ColBits;
+pub use column_bits_pext::ColBitsPext;
 
 #[cfg(test)]
 #[test]
@@ -28,11 +37,12 @@ fn check_same() {
     dbg!(&piece_sequence);
 
     let results = vec![
-        naive::benchmark(&piece_sequence).fumenize(),
-        naive_col_heights::benchmark(&piece_sequence).fumenize(),
-        row_bits::benchmark(&piece_sequence).fumenize(),
-        row_bits_col_heights::benchmark(&piece_sequence).fumenize(),
-        column_bits::benchmark(&piece_sequence).fumenize(),
+        Naive::simulate(&piece_sequence).fumenize(),
+        NaiveColHeights::simulate(&piece_sequence).fumenize(),
+        RowBits::simulate(&piece_sequence).fumenize(),
+        RowBitsColHeights::simulate(&piece_sequence).fumenize(),
+        ColBits::simulate(&piece_sequence).fumenize(),
+        ColBitsPext::simulate(&piece_sequence).fumenize(),
     ];
 
     dbg!(results.iter().map(|f| f.encode()).collect::<Vec<_>>());
@@ -40,4 +50,29 @@ fn check_same() {
     for i in 1..results.len() {
         assert!(results[0] == results[i]);
     }
+}
+
+pub trait Implementation {
+    type Board: BoardImpl;
+
+    const NAME: &'static str;
+
+    fn suggest(board: &Self::Board, piece: Piece) -> Option<PieceLocation>;
+
+    fn simulate(pieces: &[Piece]) -> Self::Board {
+        let mut board = Self::Board::new();
+        for &p in pieces {
+            if let Some(placement) = Self::suggest(&board, p) {
+                board.place(placement);
+                board.collapse_lines();
+            }
+        }
+        board
+    }
+}
+
+pub trait BoardImpl {
+    fn new() -> Self;
+    fn place(&mut self, placement: PieceLocation);
+    fn collapse_lines(&mut self) -> i32;
 }

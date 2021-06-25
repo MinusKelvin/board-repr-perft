@@ -9,7 +9,9 @@ Performance testing various board representations in Dellacherie's algorithm.
 - The `pext` version of `col bits` uses the x86_64 instruction `pext` to compute
   line clears, which is not available on all platforms.
 
-![](results.svg)
+![](dellacherie.svg)
+
+![](advance.svg)
 
 Measured on an AMD Ryzen 7 3700X. Compiled with `-C target-cpu=native`. Note
 that Zen 2 (such as my 3700X) and earlier AMD CPUs have slow implementations of

@@ -1,4 +1,6 @@
-use crate::common::*;
+use crate::{BoardImpl, Implementation, common::*};
+
+pub struct RowBits;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Board {
@@ -7,13 +9,9 @@ pub struct Board {
 
 const FILLED: u16 = (1 << 10) - 1;
 
-impl Board {
+impl BoardImpl for Board {
     fn new() -> Self {
         Board { rows: [0; 40] }
-    }
-
-    fn get(&self, x: i8, y: i8) -> bool {
-        self.rows[y as usize] & 1 << x != 0
     }
 
     fn place(&mut self, piece: PieceLocation) {
@@ -36,6 +34,12 @@ impl Board {
         }
         40 - current as i32
     }
+}
+
+impl Board {
+    fn get(&self, x: i8, y: i8) -> bool {
+        self.rows[y as usize] & 1 << x != 0
+    }
 
     #[cfg(test)]
     pub fn fumenize(self) -> fumen::Fumen {
@@ -52,16 +56,10 @@ impl Board {
     }
 }
 
-pub fn benchmark(pieces: &[Piece]) -> Board {
-    let mut board = Board::new();
-    for &p in pieces {
-        if let Some(placement) = suggest(&board, p) {
-            board.place(placement);
-            board.collapse_lines();
-        }
-    }
-    board
-}
+impl Implementation for RowBits {
+    type Board = Board;
+
+    const NAME: &'static str = "row bits";
 
 fn suggest(board: &Board, piece: Piece) -> Option<PieceLocation> {
     let mut best = None;
@@ -128,6 +126,7 @@ fn suggest(board: &Board, piece: Piece) -> Option<PieceLocation> {
     }
 
     best.map(|(p, _)| p)
+}
 }
 
 fn blocked(board: &Board, piece: PieceLocation) -> bool {

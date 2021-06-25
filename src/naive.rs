@@ -1,19 +1,17 @@
-use crate::common::*;
+use crate::{common::*, BoardImpl, Implementation};
+
+pub struct Naive;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Board {
     cells: [[bool; 10]; 40],
 }
 
-impl Board {
+impl BoardImpl for Board {
     fn new() -> Self {
         Board {
             cells: [[false; 10]; 40],
         }
-    }
-
-    fn get(&self, x: i8, y: i8) -> bool {
-        self.cells[y as usize][x as usize]
     }
 
     fn place(&mut self, piece: PieceLocation) {
@@ -36,6 +34,12 @@ impl Board {
         }
         40 - current as i32
     }
+}
+
+impl Board {
+    fn get(&self, x: i8, y: i8) -> bool {
+        self.cells[y as usize][x as usize]
+    }
 
     #[cfg(test)]
     pub fn fumenize(self) -> fumen::Fumen {
@@ -52,82 +56,77 @@ impl Board {
     }
 }
 
-pub fn benchmark(pieces: &[Piece]) -> Board {
-    let mut board = Board::new();
-    for &p in pieces {
-        if let Some(placement) = suggest(&board, p) {
-            board.place(placement);
-            board.collapse_lines();
-        }
-    }
-    board
-}
+impl Implementation for Naive {
+    type Board = Board;
 
-fn suggest(board: &Board, piece: Piece) -> Option<PieceLocation> {
-    let mut best = None;
+    const NAME: &'static str = "naive";
 
-    for &rotation in piece.sensible_rotations() {
-        for x in 0..10 {
-            let mut piece = PieceLocation {
-                piece,
-                rotation,
-                x,
-                y: 37,
-            };
+    fn suggest(board: &Board, piece: Piece) -> Option<PieceLocation> {
+        let mut best = None;
 
-            if blocked(board, piece) {
-                continue;
-            }
+        for &rotation in piece.sensible_rotations() {
+            for x in 0..10 {
+                let mut piece = PieceLocation {
+                    piece,
+                    rotation,
+                    x,
+                    y: 37,
+                };
 
-            while !blocked(board, piece) {
-                piece.y -= 1;
-            }
-            piece.y += 1;
+                if blocked(board, piece) {
+                    continue;
+                }
 
-            let mut board = *board;
-            board.place(piece);
+                while !blocked(board, piece) {
+                    piece.y -= 1;
+                }
+                piece.y += 1;
 
-            let piece_cells_eliminated = piece
-                .cells()
-                .iter()
-                .filter(|&&(_, y)| board.cells[y as usize] == [true; 10])
-                .count() as i32;
+                let mut board = *board;
+                board.place(piece);
 
-            let lines_cleared = board.collapse_lines();
+                let piece_cells_eliminated = piece
+                    .cells()
+                    .iter()
+                    .filter(|&&(_, y)| board.cells[y as usize] == [true; 10])
+                    .count() as i32;
 
-            let mut low = 40;
-            let mut high = 0;
-            for &(_, y) in &piece.cells() {
-                low = low.min(y);
-                high = high.max(y);
-            }
+                let lines_cleared = board.collapse_lines();
 
-            let landing_height = low as i32 + high as i32;
-            let eroded_piece_cells_metric = lines_cleared * piece_cells_eliminated;
-            let row_transitions = row_transitions(&board);
-            let column_transitions = column_transitions(&board);
-            let buried_holes = buried_holes(&board);
-            let wells = wells(&board);
+                let mut low = 40;
+                let mut high = 0;
+                for &(_, y) in &piece.cells() {
+                    low = low.min(y);
+                    high = high.max(y);
+                }
 
-            let score = 2 * eroded_piece_cells_metric
-                - landing_height
-                - 2 * row_transitions
-                - 2 * column_transitions
-                - 8 * buried_holes
-                - 2 * wells;
+                let landing_height = low as i32 + high as i32;
+                let eroded_piece_cells_metric = lines_cleared * piece_cells_eliminated;
+                let row_transitions = row_transitions(&board);
+                let column_transitions = column_transitions(&board);
+                let buried_holes = buried_holes(&board);
+                let wells = wells(&board);
 
-            match best {
-                None => best = Some((piece, score)),
-                Some((_, s)) => {
-                    if score > s {
-                        best = Some((piece, score))
+                let score = 2 * eroded_piece_cells_metric
+                    - landing_height
+                    - 2 * row_transitions
+                    - 2 * column_transitions
+                    - 8 * buried_holes
+                    - 2 * wells;
+
+                match best {
+                    None => best = Some((piece, score)),
+                    Some((_, s)) => {
+                        if score > s {
+                            best = Some((piece, score))
+                        }
                     }
                 }
             }
         }
-    }
 
-    best.map(|(p, _)| p)
+        best.map(|(p, _)| p)
+    }
 }
 
 fn blocked(board: &Board, piece: PieceLocation) -> bool {
