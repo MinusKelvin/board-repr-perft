@@ -26,6 +26,9 @@ impl BoardImpl for Board {
             if self.cells[i] == [true; 10] {
                 continue;
             }
+            if self.cells[current] == [false; 10] {
+                return (i - current) as i32;
+            }
             self.cells[current] = self.cells[i];
             current += 1;
         }

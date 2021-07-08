@@ -26,6 +26,9 @@ impl BoardImpl for Board {
             if self.rows[i] == FILLED {
                 continue;
             }
+            if self.rows[current] == 0 {
+                return (i - current) as i32;
+            }
             self.rows[current] = self.rows[i];
             current += 1;
         }
