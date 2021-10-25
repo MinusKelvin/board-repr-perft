@@ -179,19 +179,18 @@ fn buried_holes(board: &Board) -> i32 {
 fn wells(board: &Board) -> i32 {
     let mut score = 0;
     for y in 0..40 {
-        for x in 0..10 {
-            let left = x == 0 || board.get(x - 1, y);
-            let right = x == 9 || board.get(x + 1, y);
-            if left && right && !board.get(x, y) {
-                // Count the number of empty cells below, including the well cell
-                for y in (0..=y).rev() {
-                    if board.get(x, y) {
-                        break;
-                    }
-                    score += 1;
-                }
+        let row = board.rows[y];
+        // Locate the well cells in this row
+        let mut well_cells = (row >> 1 | 1 << 9) & !row & (row << 1 | 1);
+        score += well_cells.count_ones();
+        for j in (0..y).rev() {
+            // Mask off the well cells that hit the ground
+            well_cells &= !board.rows[j];
+            if well_cells == 0 {
+                break;
             }
+            score += well_cells.count_ones();
         }
     }
-    score
+    score as i32
 }
