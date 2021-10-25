@@ -10,6 +10,7 @@ edition = "2018"
 criterion = { version = "0.3.4", features = ["html_reports"] }
 rand = "0.8.3"
 fumen = "0.1.2"
+rand_pcg = "0.3.1"
 
 [[bench]]
 name = "benchmarks"

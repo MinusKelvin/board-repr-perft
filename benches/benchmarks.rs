@@ -65,9 +65,11 @@ criterion_group! {
 criterion_main!(benchmarks);
 
 fn gen_seq(n: usize) -> Vec<Piece> {
+    let mut rng = rand_pcg::Pcg64::new(0xcafef00dd15ea5e5, 0xa02bdbf7bb3c0a7ac28fa16a64abf96);
+
     let mut piece_sequence = Vec::with_capacity(n);
     for _ in 0..n {
-        piece_sequence.push(match thread_rng().gen_range(0..7) {
+        piece_sequence.push(match rng.gen_range(0..7) {
             0 => Piece::I,
             1 => Piece::O,
             2 => Piece::T,
