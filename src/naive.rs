@@ -191,17 +191,17 @@ fn buried_holes(board: &Board) -> i32 {
 
 fn wells(board: &Board) -> i32 {
     let mut score = 0;
+    let mut depths = [0; 10];
     for y in 0..40 {
         for x in 0..10 {
-            let left = x == 0 || board.get(x - 1, y);
-            let right = x == 9 || board.get(x + 1, y);
-            if left && right && !board.get(x, y) {
-                // Count the number of empty cells below, including the well cell
-                for y in (0..=y).rev() {
-                    if board.get(x, y) {
-                        break;
-                    }
-                    score += 1;
+            if board.get(x, y) {
+                depths[x as usize] = 0;
+            } else {
+                depths[x as usize] += 1;
+                let left = x == 0 || board.get(x - 1, y);
+                let right = x == 9 || board.get(x + 1, y);
+                if left && right {
+                    score += depths[x as usize];
                 }
             }
         }
