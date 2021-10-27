@@ -162,6 +162,9 @@ fn column_transitions(board: &Board) -> i32 {
     for &row in &board.rows {
         count += (row ^ previous).count_ones();
         previous = row;
+        if row == 0 {
+            break;
+        }
     }
     count as i32
 }
@@ -190,6 +193,9 @@ fn wells(board: &Board) -> i32 {
                 break;
             }
             score += well_cells.count_ones();
+        }
+        if row == 0 {
+            break;
         }
     }
     score as i32

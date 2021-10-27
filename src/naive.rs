@@ -171,19 +171,27 @@ fn column_transitions(board: &Board) -> i32 {
     for row in &board.cells {
         count += (0..10).filter(|&x| row[x] != previous[x]).count();
         previous = *row;
+        if *row == [false; 10] {
+            break;
+        }
     }
     count as i32
 }
 
 fn buried_holes(board: &Board) -> i32 {
     let mut count = 0;
-    let mut is_column_covered = [false; 10];
-    for row in board.cells.iter().rev() {
+    let mut depths = [0; 10];
+    for row in board.cells.iter() {
         for x in 0..10 {
-            if is_column_covered[x] && !row[x] {
-                count += 1;
+            if row[x] {
+                count += depths[x];
+                depths[x] = 0;
+            } else {
+                depths[x] += 1;
             }
-            is_column_covered[x] |= row[x];
+        }
+        if *row == [false; 10] {
+            break;
         }
     }
     count
@@ -193,9 +201,11 @@ fn wells(board: &Board) -> i32 {
     let mut score = 0;
     let mut depths = [0; 10];
     for y in 0..40 {
+        let mut all_empty = true;
         for x in 0..10 {
             if board.get(x, y) {
                 depths[x as usize] = 0;
+                all_empty = false;
             } else {
                 depths[x as usize] += 1;
                 let left = x == 0 || board.get(x - 1, y);
@@ -204,6 +214,9 @@ fn wells(board: &Board) -> i32 {
                     score += depths[x as usize];
                 }
             }
+        }
+        if all_empty {
+            break;
         }
     }
     score
