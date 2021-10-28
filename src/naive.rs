@@ -145,24 +145,24 @@ fn blocked(board: &Board, piece: PieceLocation) -> bool {
 }
 
 fn row_transitions(board: &Board) -> i32 {
-    board
-        .cells
-        .iter()
-        .map(|row| {
-            let mut previous = true;
-            let mut count = 0;
-            for &cell in row {
-                if cell != previous {
-                    count += 1;
-                }
-                previous = cell;
-            }
-            if !previous {
+    let mut count = 0;
+    for (y, row) in board.cells.iter().enumerate() {
+        if *row == [false; 10] {
+            count += (40 - y as i32) * 2;
+            break;
+        }
+        let mut previous = true;
+        for &cell in row {
+            if cell != previous {
                 count += 1;
             }
-            count
-        })
-        .sum()
+            previous = cell;
+        }
+        if !previous {
+            count += 1;
+        }
+    }
+    count
 }
 
 fn column_transitions(board: &Board) -> i32 {

@@ -145,15 +145,17 @@ fn blocked(board: &Board, piece: PieceLocation) -> bool {
 }
 
 fn row_transitions(board: &Board) -> i32 {
-    board
-        .rows
-        .iter()
-        .map(|&row| {
-            let row = row | !FILLED;
-            let transitions = row ^ (row << 1 | 1);
-            transitions.count_ones() as i32
-        })
-        .sum()
+    let mut count = 0;
+    for (y, &row) in board.rows.iter().enumerate() {
+        if row == 0 {
+            count += (40 - y as i32) * 2;
+            break;
+        }
+        let row = row | !FILLED;
+        let transitions = row ^ (row << 1 | 1);
+        count += transitions.count_ones() as i32;
+    }
+    count
 }
 
 fn column_transitions(board: &Board) -> i32 {
